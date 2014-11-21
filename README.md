@@ -9,7 +9,7 @@ Ahhoz, hogy működjön opencv feltelepítése után Linuxban a Cobeblocks-ban a
 Plusz az egérműveletekhez fel kell telepíteni a libx11 és libxtst libeket:
 sudo apt-get install libx11-dev
 sudo apt-get install libxtst-dev
-Ezután codeblocksban hozzá kell adni a következőket a Settings -# Compiler -> Linker Settings-ben: 
+Ezután codeblocksban hozzá kell adni a következőket a Settings -> Compiler -> Linker Settings-ben: 
 /usr/lib/x86_64-linux-gnu/libX11.so
 /usr/lib/x86_64-linux-gnu/libXtst.so
 Ha minden igaz ezek után futnia kell :D
