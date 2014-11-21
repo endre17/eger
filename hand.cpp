@@ -5,19 +5,32 @@
 #include<stdio.h>
 //Blob Library Headers
 #include<cvblob.h>
-//Definitions
+//Kamerakep magassaga, szelessege
 #define h 240
 #define w 320
+//Ciklusok szama, ameddig adott szinnek szerepelnie kell, hogy egerrel elvegezzuk a muveletet
+#define sure 30
+
+//X11 lib headers egermuveletekhez.
+#include <X11/Xlib.h>
+#include <X11/keysym.h>
+#include <X11/extensions/XTest.h>
+
 //NameSpaces
 using namespace cvb;
 using namespace std;
 
-int blue_nmbr=0, minarea=50, maxarea=1000;
-int lower_red[3] = {150, 50, 50};
-int upper_red[3] = {180, 255, 255};
-int lower_blue[3] = {100, 135, 135};
-int upper_blue[3] = {130, 255, 255};
-int lower_green[3] = {25, 50, 50};
+int blue_count=0, green_count=0;
+int minarea=60, maxarea=2000;
+int sure_blue1=0, sure_blue2=0, sure_green=0;
+//Ket piros tartomany is van de egyiket tudom csak beadni.
+//int lower_red[3] = {165, 135, 80};
+//int upper_red[3] = {180, 255, 255};
+int lower_red[3] = {0, 135, 80};
+int upper_red[3] = {10, 255, 255};
+int lower_blue[3] = {95, 135, 135};
+int upper_blue[3] = {125, 255, 255};
+int lower_green[3] = {25, 135, 80};
 int upper_green[3] = {75, 255, 255};
 
 void detect_blob(IplImage* hsvframe, int* lower, int* upper, IplImage* threshold, IplImage* labelImg, CvBlobs& blobs, IplImage* frame){
@@ -35,16 +48,41 @@ void detect_blob(IplImage* hsvframe, int* lower, int* upper, IplImage* threshold
 
 }
 
+void move_cursor(Display* display, int x, int y){
+
+    XTestFakeMotionEvent(display, -1, x, y, CurrentTime);
+    XSync(display, 0);
+
+}
+
+
+void mouse_click(Display* display, int button_nmbr){
+
+    XTestFakeButtonEvent (display, button_nmbr, True,  CurrentTime);
+    XTestFakeButtonEvent (display, button_nmbr, False,  CurrentTime);
+    XSync(display, 0);
+
+}
+
+void double_click(Display* display, int button_nmbr){
+
+    XTestFakeButtonEvent (display, button_nmbr, True,  CurrentTime);
+    XTestFakeButtonEvent (display, button_nmbr, False,  CurrentTime);
+    XTestFakeButtonEvent (display, button_nmbr, True,  CurrentTime);
+    XTestFakeButtonEvent (display, button_nmbr, False,  CurrentTime);
+    XSync(display, 0);
+
+}
 
 int main()
 {
+
+        Display *dpy = XOpenDisplay(NULL);
+        Screen*  scrn = DefaultScreenOfDisplay(dpy);
+
         //Structure to get feed from CAM
         CvCapture* capture=cvCreateCameraCapture(0);
 
-        if (!capture) {
-                cerr<< "Error initializing capture" << endl;
-                exit(1);
-        }
         //Structure to hold blobs
         CvBlobs red_blobs, blue_blobs, green_blobs;
         //Windows
@@ -61,12 +99,20 @@ int main()
         IplImage *threshg=cvCreateImage(cvSize(w,h),8,1); //Threshold image of green color
 
         //Getting the screen information
-        int screenx = 1920;
-        int screeny = 1080;
+
+        int screenx = scrn->width;
+        int screeny = scrn->height;
+
+        if (!capture) {
+            cerr<< "Error initializing capture" << endl;
+            exit(1);
+        }
 
         while(1)
         {
-                blue_nmbr=0;
+                blue_count=0;
+                green_count=0;
+
                 //Getting the current frame
                 IplImage *fram=cvQueryFrame(capture);
                 //If failed to get break the loop
@@ -79,36 +125,6 @@ int main()
                 //Changing the color space
                 cvCvtColor(frame,hsvframe,CV_BGR2HSV);
 
-/*              //Ezt a reszt valositja meg a detect_blob fgv, hogy ne kelljen tobbszor ugyanazt a fgvt meghivni.
-                //Thresholding the frame for yellow , inputkepbol(hsvframe) a megadott intervallumu szineket hagyva meg teszi az outputkepbe(threshy)
-                //cvInRangeS(hsvframe,cvScalar(160,135,135),cvScalar(180,255,255),threshr);
-                cvInRangeS(hsvframe,cvScalar(150,50,50),cvScalar(180,255,255),threshr);
-                cvInRangeS(hsvframe,cvScalar(100,135,135),cvScalar(130,255,255),threshb);
-                cvInRangeS(hsvframe,cvScalar(25,50,50),cvScalar(75,255,255),threshg);
-
-
-                //Filtering the frame
-                cvSmooth(threshr,threshr,CV_MEDIAN,7,7);
-                cvSmooth(threshb,threshb,CV_MEDIAN,7,7);
-                cvSmooth(threshg,threshg,CV_MEDIAN,7,7);
-
-
-                //Finding the blobs (result:pixelek szama)
-                unsigned int red_result=cvLabel(threshr,labelImg_red,red_blobs);
-                unsigned int blue_result=cvLabel(threshb,labelImg_blue,blue_blobs);
-                unsigned int green_result=cvLabel(threshg,labelImg_green,green_blobs);
-
-
-                //Rendering the blobs
-                cvRenderBlobs(labelImg_red,red_blobs,frame,frame);
-                cvRenderBlobs(labelImg_blue,blue_blobs,frame,frame);
-                cvRenderBlobs(labelImg_green,green_blobs,frame,frame);
-
-                //Filtering the blobs
-                cvFilterByArea(red_blobs,60,500);
-                cvFilterByArea(blue_blobs,minarea,maxarea);
-                cvFilterByArea(green_blobs,60,500);
-*/
                 //Piros teruletek keresese
                 detect_blob(hsvframe, lower_red, upper_red, threshr, labelImg_red, red_blobs, frame);
 
@@ -119,34 +135,85 @@ int main()
                 detect_blob(hsvframe, lower_green, upper_green, threshg, labelImg_green, green_blobs, frame);
 
 
+                //Koordinatakat adja meg a blobhoz(kurzor mozgatashoz jo)
+                for (CvBlobs::const_iterator it=red_blobs.begin(); it!=red_blobs.end(); ++it)
+                {
+
+                        double a = it->second->centroid.x;
+                        double b = it->second->centroid.y;
+
+                        //Ha a kamera is arra 'nez', amerre mi akkor kell ez
+                        //int x=screenx-((int)(a*screenx/w));
+                        //int y=(int)(b*screeny/h);
+
+                        //Ha a kamera szemben van, akkor kell ez
+                        int x=(int)(a*screenx/w);
+                        int y=screeny-((int)(b*screeny/h));
+
+                        //Egerkuzor mozgatasa
+
+                        move_cursor(dpy, x, y);
+                        break;
+                }
+
+
                 //Kek teruletekbol mennyi van adott kepkockan.
                 for (CvBlobs::const_iterator it=blue_blobs.begin(); it!=blue_blobs.end(); ++it){
-                    blue_nmbr++;
+                    blue_count++;
                 }
-                if(blue_nmbr){
-                    cout<<blue_nmbr<<endl;
+                /*
+                if(blue_count){
+                    cout<<"Kek teruletek: "<<blue_count<<endl;
+                }
+                */
+                for (CvBlobs::const_iterator it=green_blobs.begin(); it!=green_blobs.end(); ++it){
+                    green_count++;
                 }
 
 /*
-                //Koordinatakat adja meg a blobhoz(kurzor mozgatashoz jo)
-                for (CvBlobs::const_iterator it=blue_blobs.begin(); it!=blue_blobs.end(); ++it)
-                {
-                        double moment10 = it->second->m10;
-                        double moment01 = it->second->m01;
-                        double area = it->second->area;
-                        //Variable for holding position
-                        int x1;
-                        int y1;
-                        //Calculating the current position
-                        x1 = moment10/area;
-                        y1 = moment01/area;
-                        //Mapping to the screen coordinates
-                        int x=(int)(x1*screenx/w);
-                        int y=(int)(y1*screeny/h);
-                        //Printing the position information
-                        cout<<"X: "<<x<<" Y: "<<y<<endl;
+                if(green_count){
+                    cout<<"Zold teruletek: "<<green_count<<endl;
                 }
 */
+
+                //Ahhoz, hogy tudjuk biztosra, hogy milyen kattintast akarunk vegezni noveljunk az ahhoz adott tartozo valtozot aszerint hogy mennyi olyan szinu terulet van a kepen.
+                if(blue_count==1){
+                    sure_blue1++;
+                    sure_blue2=0;
+                }else if(blue_count==2){
+                    sure_blue2++;
+                    sure_blue1=0;
+                }else{
+                    sure_blue1=0;
+                    sure_blue2=0;
+                }
+
+                if(green_count==1){
+                    sure_green++;
+                }else{
+                    sure_green=0;
+                }
+
+                //cout<<"Biztos 1 kek: "<<sure_blue1<<endl;
+                //cout<<"Biztos 2 kek: "<<sure_blue2<<endl;
+                //cout<<"Biztos zold: "<<sure_green<<endl;
+
+                //Ha valamelyik eleri a biztos erteket, akkor vegrehajtuk a muveletet, es visszaallitjuk a kezdoerteket.
+                if(sure_blue1==sure){
+                    //Bal kattintas
+                    mouse_click(dpy, 1);
+                    sure_blue1=0;
+
+                }else if(sure_blue2==sure){
+                    //Dupla bal kattintas
+                    double_click(dpy, 1);
+                    sure_blue2=0;
+                }else if(sure_green==sure){
+                    //Jobb kattintas
+                    mouse_click(dpy, 3);
+                    sure_green=0;
+
+                }
 
                 //Showing the images
                 cvShowImage("Live",frame);
@@ -156,6 +223,7 @@ int main()
                 break;
         }
         //Cleanup
+        XCloseDisplay(dpy);
         cvReleaseCapture(&capture);
         cvDestroyAllWindows();
 
