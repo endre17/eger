@@ -22,15 +22,18 @@ using namespace std;
 
 int blue_count=0, green_count=0;
 int minarea=60, maxarea=2000;
-int sure_blue1=0, sure_blue2=0, sure_green=0;
+int sure_blue1=0, sure_blue2=0, sure_blue3=0;
+
+//előző helyzete a zöldnek
+double prev = 0;
 //Ket piros tartomany is van de egyiket tudom csak beadni.
-//int lower_red[3] = {165, 135, 80};
-//int upper_red[3] = {180, 255, 255};
-int lower_red[3] = {0, 135, 80};
-int upper_red[3] = {10, 255, 255};
+int lower_red[3] = {165, 80, 80};
+int upper_red[3] = {180, 255, 255};
+//int lower_red[3] = {0, 180, 180};
+//int upper_red[3] = {10, 255, 255};
 int lower_blue[3] = {95, 135, 135};
 int upper_blue[3] = {125, 255, 255};
-int lower_green[3] = {25, 135, 80};
+int lower_green[3] = {35, 80, 80};
 int upper_green[3] = {75, 255, 255};
 
 void detect_blob(IplImage* hsvframe, int* lower, int* upper, IplImage* threshold, IplImage* labelImg, CvBlobs& blobs, IplImage* frame){
@@ -157,6 +160,32 @@ int main()
                 }
 
 
+                for (CvBlobs::const_iterator it=green_blobs.begin(); it!=green_blobs.end(); ++it)
+                {
+
+                        double next = it->second->centroid.y;
+
+                         //Ha a kamera is arra 'nez', amerre mi akkor kell ez
+                         /*
+                        if(next - prev > 0){
+                            mouse_click(dpy, 5);
+                        }else{
+                            mouse_click(dpy, 4);
+                        }
+                        */
+                        //Ha a kamera szemben van, akkor kell ez
+                        if(next - prev > 0){
+                            mouse_click(dpy, 4);
+                        }else{
+                            mouse_click(dpy, 5);
+                        }
+
+                        //cout<<"Pozicio:"<<next<<endl;
+                        prev = next;
+                        break;
+                }
+
+
                 //Kek teruletekbol mennyi van adott kepkockan.
                 for (CvBlobs::const_iterator it=blue_blobs.begin(); it!=blue_blobs.end(); ++it){
                     blue_count++;
@@ -166,37 +195,32 @@ int main()
                     cout<<"Kek teruletek: "<<blue_count<<endl;
                 }
                 */
-                for (CvBlobs::const_iterator it=green_blobs.begin(); it!=green_blobs.end(); ++it){
-                    green_count++;
-                }
 
-/*
-                if(green_count){
-                    cout<<"Zold teruletek: "<<green_count<<endl;
-                }
-*/
 
                 //Ahhoz, hogy tudjuk biztosra, hogy milyen kattintast akarunk vegezni noveljunk az ahhoz adott tartozo valtozot aszerint hogy mennyi olyan szinu terulet van a kepen.
                 if(blue_count==1){
                     sure_blue1++;
                     sure_blue2=0;
+                    sure_blue3=0;
                 }else if(blue_count==2){
                     sure_blue2++;
                     sure_blue1=0;
+                    sure_blue3=0;
+                }else if(blue_count==3){
+                    sure_blue3++;
+                    sure_blue1=0;
+                    sure_blue2=0;
                 }else{
                     sure_blue1=0;
                     sure_blue2=0;
+                    sure_blue3=0;
                 }
 
-                if(green_count==1){
-                    sure_green++;
-                }else{
-                    sure_green=0;
-                }
+
 
                 //cout<<"Biztos 1 kek: "<<sure_blue1<<endl;
                 //cout<<"Biztos 2 kek: "<<sure_blue2<<endl;
-                //cout<<"Biztos zold: "<<sure_green<<endl;
+                //cout<<"Biztos 3 kek: "<<sure_blue3<<endl;
 
                 //Ha valamelyik eleri a biztos erteket, akkor vegrehajtuk a muveletet, es visszaallitjuk a kezdoerteket.
                 if(sure_blue1==sure){
@@ -208,10 +232,10 @@ int main()
                     //Dupla bal kattintas
                     double_click(dpy, 1);
                     sure_blue2=0;
-                }else if(sure_green==sure){
+                }else if(sure_blue3==sure){
                     //Jobb kattintas
                     mouse_click(dpy, 3);
-                    sure_green=0;
+                    sure_blue3=0;
 
                 }
 
